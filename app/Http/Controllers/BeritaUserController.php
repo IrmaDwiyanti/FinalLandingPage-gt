@@ -29,72 +29,74 @@ class BeritaUserController extends Controller
     // Menyimpan berita baru
     public function store(Request $request)
     {
+        // Validasi inputan
         $request->validate([
             'title' => 'required',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'author' => 'required',
             'date' => 'required|date',
             'content' => 'required',
-            /* 'status' => 'required|in:0,1', */
         ]);
-
-       /*  $status = $request->input('status', '0'); */
-       $path = null;
-       if ($request->hasFile('image')) {
-           $path = $request->file('image')->store('images', 'public');
-       }
-   
-       // Proses konten berita
-       $description = $request->content;
-       $dom = new \DomDocument();
-   
-       // Load deskripsi baru ke DOMDocument
-       @$dom->loadHtml($description, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-   
-       // Proses tag <img> dalam konten
-       $imageFile = $dom->getElementsByTagName('img');
-       $newImages = [];
-       foreach ($imageFile as $item => $image) {
-           $data = $image->getAttribute('src');
-   
-           // Jika gambar berbentuk base64, simpan ke server
-           if (strpos($data, 'base64') !== false) {
-               list($type, $data) = explode(';', $data);
-               list(, $data) = explode(',', $data);
-               $imageData = base64_decode($data);
-   
-               // Tentukan nama file unik
-               $image_name = "/upload/" . time() . $item . '.png';
-               $path = public_path() . $image_name;
-   
-               // Simpan gambar ke server
-               file_put_contents($path, $imageData);
-   
-               // Perbarui atribut src dengan path gambar baru
-               $image->removeAttribute('src');
-               $image->setAttribute('src', $image_name);
-   
-               // Tambahkan ke daftar gambar baru
-               $newImages[] = $path;
-           }
-       }
-   
-       // Simpan kembali deskripsi yang telah diperbarui
-       $description = $dom->saveHTML();
-   
-       // Simpan data ke database
-       Berita::create([
-           'title' => $request->title,
-           'author' => $request->author,
-           'date' => $request->date,
-           'content' => $description,
-           'image' => $path,
-/*            'status' => $request->status,
- */           'user_id' => Auth::id(),
-       ]);
-
+    
+        // Proses penyimpanan gambar cover jika ada
+        $path = null;
+        if ($request->hasFile('image')) {
+            // Menyimpan cover image
+            $path = $request->file('image')->store('images', 'public');
+        }
+    
+        // Proses konten berita
+        $description = $request->content;
+        $dom = new \DomDocument();
+    
+        // Load konten ke DOMDocument
+        @$dom->loadHtml($description, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    
+        // Proses tag <img> dalam konten
+        $imageFile = $dom->getElementsByTagName('img');
+        $newImages = [];
+        foreach ($imageFile as $item => $image) {
+            $data = $image->getAttribute('src');
+    
+            // Jika gambar berbentuk base64, simpan ke server
+            if (strpos($data, 'base64') !== false) {
+                list($type, $data) = explode(';', $data);
+                list(, $data) = explode(',', $data);
+                $imageData = base64_decode($data);
+    
+                // Tentukan nama file gambar yang unik
+                $image_name = "/upload/" . time() . $item . '.png';
+                $pathImage = public_path() . $image_name;
+    
+                // Simpan gambar ke server
+                file_put_contents($pathImage, $imageData);
+    
+                // Perbarui atribut src dengan path gambar baru
+                $image->removeAttribute('src');
+                $image->setAttribute('src', $image_name);
+    
+                // Tambahkan ke daftar gambar baru
+                $newImages[] = $pathImage;
+            }
+        }
+    
+        // Simpan konten yang telah diperbarui
+        $description = $dom->saveHTML();
+    
+        // Simpan data berita ke database
+        Berita::create([
+            'title' => $request->title,
+            'author' => $request->author,
+            'date' => $request->date,
+            'content' => $description,
+            'image' => $path, // Menyimpan cover image
+            'user_id' => Auth::id(),
+        ]);
+    
+        // Redirect dengan pesan sukses
         return redirect()->route('pages copy.dashboard.berita.index')->with('success', 'Berita berhasil ditambahkan.');
     }
+    
 
     // Mengupdate berita
     public function update(Request $request, $id) {
